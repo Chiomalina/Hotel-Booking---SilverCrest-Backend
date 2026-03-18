@@ -7,8 +7,8 @@ const bookingSchema = new mongoose.Schema(
     hotel: { type: String, ref: "Hotel", required: true },
     checkInDate: { type: Date, required: true },
     checkOutDate: { type: Date, required: true },
-    totalPrice: { type: Number, require: true },
-    guests: { type: Number, require: true },
+    totalPrice: { type: Number, required: true },
+    guests: { type: Number, required: true },
     status: {
       type: String,
       enum: ["pending", "confirmed", "cancelled"],
