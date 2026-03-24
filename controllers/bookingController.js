@@ -2,6 +2,7 @@ import transporter from "../configs/nodemailer.js";
 import Booking from "../models/Booking.js";
 import Hotel from "../models/Hotels.js";
 import Room from "../models/Room.js";
+import Stripe from "stripe";
 
 // Function to check availabilty of Room
 const checkAvailability = async ({ checkInDate, checkOutDate, room }) => {
@@ -156,5 +157,98 @@ export const getHotelBookings = async (req, res) => {
       success: false,
       message: "Failed to fetch hotel bookings",
     });
+  }
+};
+
+// Stripe Payment Controller
+export const stripePayment = async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+    const { origin } = req.headers;
+
+    if (!bookingId) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking ID is required",
+      });
+    }
+
+    const booking = await Booking.findById(bookingId);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
+    }
+
+    const roomData = await Room.findById(booking.room).populate("hotel");
+    if (!roomData) {
+      return res.status(404).json({
+        success: false,
+        message: "Room not found",
+      });
+    }
+
+    if (!roomData.hotel) {
+      return res.status(404).json({
+        success: false,
+        message: "Hotel not found",
+      });
+    }
+
+    if (!booking.totalPrice || booking.totalPrice <= 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid booking amount",
+      });
+    }
+    if (!origin) {
+      return res.status(404).json({
+        success: false,
+        message: "Request origin is missing",
+      });
+    }
+
+    const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    // Create line items
+    const line_items = [
+      {
+        price_data: {
+          currency: "eur",
+          product_data: {
+            name: roomData.hotel.name,
+            description: `Booking for room ${roomData._id}`,
+          },
+          unit_amount: Math.round(booking.totalPrice * 100),
+        },
+        quantity: 1,
+      },
+    ];
+
+    // Create Checkout Session
+    const session = await stripeInstance.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items,
+      mode: "payment",
+      success_url: `${origin}/loader/my-bookings`,
+      cancel_url: `${origin}/my-bookings`,
+      metadata: {
+        bookingId,
+        roomId: roomData._id,
+        hotelId: roomData.hotel,
+      },
+    });
+    res.json({ success: true, url: session.url });
+  } catch (error) {
+    console.error("Stripe payment error:", error);
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "Payment failed",
+        error: error.message,
+      });
   }
 };
