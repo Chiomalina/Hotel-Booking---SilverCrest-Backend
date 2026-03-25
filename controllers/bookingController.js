@@ -219,7 +219,6 @@ export const stripePayment = async (req, res) => {
           currency: "eur",
           product_data: {
             name: roomData.hotel.name,
-            description: `Booking for room ${roomData._id}`,
           },
           unit_amount: Math.round(booking.totalPrice * 100),
         },
@@ -236,19 +235,17 @@ export const stripePayment = async (req, res) => {
       cancel_url: `${origin}/my-bookings`,
       metadata: {
         bookingId,
-        roomId: roomData._id,
-        hotelId: roomData.hotel,
+        roomId: roomData._id.toString(),
+        hotelId: roomData.hotel._id.toString(),
       },
     });
     res.json({ success: true, url: session.url });
   } catch (error) {
     console.error("Stripe payment error:", error);
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Payment failed",
-        error: error.message,
-      });
+    return res.status(500).json({
+      success: false,
+      message: "Payment failed",
+      error: error.message,
+    });
   }
 };
